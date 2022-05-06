@@ -142,8 +142,8 @@ public class ProtoExpressionConverter {
     return FromProto.from(type);
   }
 
-  private static Expression.Literal from(io.substrait.proto.Expression.Literal literal) {
-    return switch (literal.getLiteralTypeCase()) {
+  public static Expression.Literal from(io.substrait.proto.Expression.Literal literal) {
+    return switch(literal.getLiteralTypeCase()) {
       case BOOLEAN -> ExpressionCreator.bool(literal.getNullable(), literal.getBoolean());
       case I8 -> ExpressionCreator.i8(literal.getNullable(), literal.getI8());
       case I16 -> ExpressionCreator.i16(literal.getNullable(), literal.getI16());
