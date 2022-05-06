@@ -89,7 +89,7 @@ public class ProtoRelConverter {
 
     private Filter newFilter(FilterRel filterRel) {
         Rel input = from(filterRel.getInput());
-        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
+        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, input.getRecordType());
         Expression expression = expressionConverter.from(filterRel.getCondition());
         return Filter.builder().input(input).condition(expression).build();
     }
@@ -102,27 +102,35 @@ public class ProtoRelConverter {
             Type type = FromProto.from(protoType);
             types.add(type);
         }
-        Type.Struct struct = Type.Struct.builder().fields(types).build();
+        // FIXME: put in util
+        boolean isNullable = protoStruct.getNullability() == io.substrait.proto.Type.Nullability.NULLABILITY_NULLABLE;
+        Type.Struct struct = Type.Struct.builder().fields(types).nullable(isNullable).build();
         return ImmutableNamedStruct.builder().names(protoNamedStruct.getNamesList()).struct(struct).build();
     }
 
     private EmptyScan newEmptyScan(ReadRel readRel) {
         NamedStruct namedStruct = newNamedStruct(readRel);
-        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
-        Expression filter = expressionConverter.from(readRel.getFilter());
-        return EmptyScan.builder().filter(filter).initialSchema(namedStruct).build();
+        var builder = EmptyScan.builder().initialSchema(namedStruct);
+        if (readRel.hasFilter()) {
+            ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
+            Expression filter = expressionConverter.from(readRel.getFilter());
+            builder.filter(filter);
+        }
+        return builder.build();
     }
 
     private NamedScan newNamedScan(ReadRel readRel) {
         NamedStruct namedStruct = newNamedStruct(readRel);
         ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
-        Expression filter = expressionConverter.from(readRel.getFilter());
-        return NamedScan.builder()
-                .filter(filter)
+        ImmutableNamedScan.Builder builder = NamedScan.builder()
                 .initialSchema(namedStruct)
                 // FIXME: Necessary since names are already in NamedStruct?
-                .names(readRel.getBaseSchema().getNamesList())
-                .build();
+                .names(readRel.getBaseSchema().getNamesList());
+        if (readRel.hasFilter()) {
+            Expression filter = expressionConverter.from(readRel.getFilter());
+            builder.filter(filter);
+        }
+        return builder.build();
     }
 
     private VirtualTableScan newVirtualTable(ReadRel readRel) {
@@ -154,7 +162,7 @@ public class ProtoRelConverter {
 
     private Project newProject(ProjectRel projectRel) {
         Rel input = from(projectRel.getInput());
-        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
+        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, input.getRecordType());
         List<Expression> expressions = new ArrayList<>(projectRel.getExpressionsCount());
         for (io.substrait.proto.Expression protoExpression : projectRel.getExpressionsList()) {
             Expression expression = expressionConverter.from(protoExpression);
@@ -166,7 +174,7 @@ public class ProtoRelConverter {
 
     private Aggregate newAggregate(AggregateRel aggregateRel) {
         Rel input = from(aggregateRel.getInput());
-        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
+        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, input.getRecordType());
         List<Aggregate.Grouping> groupings = new ArrayList<>(aggregateRel.getGroupingsCount());
         for (AggregateRel.Grouping protoGrouping : aggregateRel.getGroupingsList()) {
             List<Expression> expressions = new ArrayList<>(protoGrouping.getGroupingExpressionsCount());
@@ -180,7 +188,6 @@ public class ProtoRelConverter {
         List<Aggregate.Measure> measures = new ArrayList<>(aggregateRel.getMeasuresCount());
         for (AggregateRel.Measure protoMeasure : aggregateRel.getMeasuresList()) {
             AggregateFunction protoAggFunction = protoMeasure.getMeasure();
-            Expression filter = expressionConverter.from(protoMeasure.getFilter());
             List<Expression> arguments = new ArrayList<>(protoAggFunction.getArgsCount());
             for (io.substrait.proto.Expression protoExpression : protoAggFunction.getArgsList()) {
                 Expression expression = expressionConverter.from(protoExpression);
@@ -188,14 +195,21 @@ public class ProtoRelConverter {
             }
             Type outputType = FromProto.from(protoAggFunction.getOutputType());
             int funcRef = protoAggFunction.getFunctionReference();
-            // FIXME: Is this correct?
-            SimpleExtension.AggregateFunctionVariant declaration = extensions.aggregateFunctions().get(funcRef);
+            SimpleExtension.AggregateFunctionVariant declaration = lookup.getAggregateFunction(funcRef, extensions);
+
             AggregateFunctionInvocation function = AggregateFunctionInvocation.builder()
                     .arguments(arguments)
                     .declaration(declaration)
                     .outputType(outputType)
+                    .aggregationPhase(Expression.AggregationPhase.fromProto(protoAggFunction.getPhase()))
                     .build();
-            Aggregate.Measure measure = Aggregate.Measure.builder().function(function).preMeasureFilter(filter).build();
+            ImmutableMeasure.Builder builder = Aggregate.Measure.builder();
+            builder.function(function);
+            if (protoMeasure.hasFilter()) {
+                Expression filter = expressionConverter.from(protoMeasure.getFilter());
+                builder.preMeasureFilter(filter);
+            }
+            Aggregate.Measure measure = builder.build();
             measures.add(measure);
         }
         return Aggregate.builder().input(input).groupings(groupings).measures(measures).build();
@@ -204,7 +218,7 @@ public class ProtoRelConverter {
     private Sort newSort(SortRel sortRel) {
         Rel input = from(sortRel.getInput());
         List<Expression.SortField> sortFields = new ArrayList<>(sortRel.getSortsCount());
-        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
+        ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, input.getRecordType());
         for (SortField protoSortField : sortRel.getSortsList()) {
             Expression expression = expressionConverter.from(protoSortField.getExpr());
             Expression.SortField sortField = Expression.SortField.builder()
@@ -219,16 +233,19 @@ public class ProtoRelConverter {
     private Join newJoin(JoinRel joinRel) {
         Rel left = from(joinRel.getLeft());
         Rel right = from(joinRel.getRight());
+        // TODO: rootType?
         ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
         Expression condition = expressionConverter.from(joinRel.getExpression());
         Join.JoinType joinType = Join.JoinType.fromProto(joinRel.getType());
-        Expression postFilter = expressionConverter.from(joinRel.getPostJoinFilter());
-        return Join.builder()
+        var builder = Join.builder()
                 .condition(condition)
                 .joinType(joinType)
                 .left(left)
-                .right(right)
-                .postJoinFilter(postFilter)
-                .build();
+                .right(right);
+        if (joinRel.hasPostJoinFilter()) {
+            Expression postFilter = expressionConverter.from(joinRel.getPostJoinFilter());
+            builder.postJoinFilter(postFilter);
+        }
+        return builder.build();
     }
 }

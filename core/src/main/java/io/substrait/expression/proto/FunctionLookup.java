@@ -1,5 +1,6 @@
 package io.substrait.expression.proto;
 
+import io.substrait.function.ImmutableSimpleExtension;
 import io.substrait.function.SimpleExtension;
 import io.substrait.proto.Plan;
 import io.substrait.proto.SimpleExtensionDeclaration;
@@ -18,6 +19,29 @@ public class FunctionLookup {
   private final BidiMap<Integer, String> uriMap = new BidiMap<>();
 
   private int counter = -1;
+
+  public FunctionLookup() {
+  }
+
+  // TODO: create ImmutableFunctionLookup
+  private FunctionLookup(Plan p) {
+    Map<Integer, String> namespaceMap = new HashMap<>();
+    for (var extension : p.getExtensionUrisList()) {
+      namespaceMap.put(extension.getExtensionUriAnchor(), extension.getUri());
+    }
+
+    for (var extension : p.getExtensionsList()) {
+      SimpleExtensionDeclaration.ExtensionFunction func = extension.getExtensionFunction();
+      int reference = func.getFunctionAnchor();
+      String namespace = namespaceMap.get(func.getExtensionUriReference());
+      if (namespace == null) {
+        throw new IllegalStateException("Could not find extension URI of " + func.getExtensionUriReference());
+      }
+      String name = func.getName();
+      SimpleExtension.FunctionAnchor anchor = SimpleExtension.FunctionAnchor.of(namespace, name);
+      map.put(reference, anchor);
+    }
+  }
 
   public int getFunctionReference(SimpleExtension.Function declaration) {
     Integer i = map.reverseGet(declaration.getAnchor());
@@ -97,6 +121,23 @@ public class FunctionLookup {
     public void put(T1 t1, T2 t2) {
       forwardMap.put(t1, t2);
       reverseMap.put(t2, t1);
+    }
+  }
+
+  public static Builder builder() {
+    return new Builder();
+  }
+
+  public static class Builder {
+    private Plan p;
+
+    public Builder from(Plan p) {
+      this.p = p;
+      return this;
+    }
+
+    public FunctionLookup build() {
+      return new FunctionLookup(p);
     }
   }
 }

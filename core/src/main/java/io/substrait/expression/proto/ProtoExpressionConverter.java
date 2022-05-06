@@ -31,7 +31,7 @@ public class ProtoExpressionConverter {
         io.substrait.proto.Expression.ReferenceSegment segment = reference.getDirectReference();
 
         var segments = new ArrayList<FieldReference.ReferenceSegment>();
-        while (segment != null) {
+        while (segment != io.substrait.proto.Expression.ReferenceSegment.getDefaultInstance()) {
           segments.add(
               switch (segment.getReferenceTypeCase()) {
                 case MAP_KEY -> {
