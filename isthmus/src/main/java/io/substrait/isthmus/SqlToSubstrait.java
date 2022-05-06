@@ -1,6 +1,7 @@
 package io.substrait.isthmus;
 
-import io.substrait.expression.proto.FunctionLookup;
+import io.substrait.expression.FunctionLookup;
+import io.substrait.expression.proto.FunctionCollector;
 import io.substrait.function.ImmutableSimpleExtension;
 import io.substrait.function.SimpleExtension;
 import io.substrait.proto.Plan;
@@ -101,8 +102,8 @@ public class SqlToSubstrait {
 
     // System.out.println(RelOptUtil.toString(root.rel));
     Rel pojoRel = SubstraitRelVisitor.convert(root, EXTENSION_COLLECTION);
-    FunctionLookup functionLookup = new FunctionLookup();
-    RelConverter toProtoRel = new RelConverter(functionLookup);
+    FunctionCollector functionCollector = new FunctionCollector();
+    RelConverter toProtoRel = new RelConverter(functionCollector);
     var protoRel = pojoRel.accept(toProtoRel);
 
     var planRel =
@@ -114,7 +115,7 @@ public class SqlToSubstrait {
 
     var plan = Plan.newBuilder();
     plan.addRelations(planRel);
-    functionLookup.addFunctionsToPlan(plan);
+    functionCollector.addFunctionsToPlan(plan);
     return plan.build();
   }
 

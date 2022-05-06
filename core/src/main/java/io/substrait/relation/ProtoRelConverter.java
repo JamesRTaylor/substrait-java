@@ -3,7 +3,7 @@ package io.substrait.relation;
 import io.substrait.expression.AggregateFunctionInvocation;
 import io.substrait.expression.Expression;
 import io.substrait.expression.ImmutableExpression;
-import io.substrait.expression.proto.FunctionLookup;
+import io.substrait.expression.FunctionLookup;
 import io.substrait.expression.proto.ProtoExpressionConverter;
 import io.substrait.function.SimpleExtension;
 import io.substrait.proto.AggregateFunction;

@@ -1,5 +1,6 @@
 package io.substrait.expression.proto;
 
+import io.substrait.expression.FunctionLookup;
 import io.substrait.expression.Expression;
 import io.substrait.expression.ExpressionCreator;
 import io.substrait.expression.FieldReference;

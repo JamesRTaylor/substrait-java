@@ -11,10 +11,10 @@ public class ExpressionProtoConverter implements ExpressionVisitor<Expression, R
   static final org.slf4j.Logger logger =
       org.slf4j.LoggerFactory.getLogger(ExpressionProtoConverter.class);
 
-  private final FunctionLookup lookup;
+  private final FunctionCollector functionCollector;
 
-  public ExpressionProtoConverter(FunctionLookup lookup) {
-    this.lookup = lookup;
+  public ExpressionProtoConverter(FunctionCollector functionCollector) {
+    this.functionCollector = functionCollector;
   }
 
   @Override
