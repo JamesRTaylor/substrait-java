@@ -13,6 +13,7 @@ import io.substrait.proto.FilterRel;
 import io.substrait.proto.JoinRel;
 import io.substrait.proto.ProjectRel;
 import io.substrait.proto.ReadRel;
+import io.substrait.proto.RelCommon;
 import io.substrait.proto.SortField;
 import io.substrait.proto.SortRel;
 import io.substrait.type.ImmutableNamedStruct;
@@ -25,10 +26,7 @@ import java.util.List;
 
 /**
  * Converts from proto to pojo rel representation
- * TODO:
- * AdvancedExtension
- * Remap
- * Missing Rel subclasses: CrossJoin, Set, etc
+ * TODO: AdvancedExtension, CrossJoin, Set
  *
  */
 public class ProtoRelConverter {
@@ -91,7 +89,11 @@ public class ProtoRelConverter {
         Rel input = from(filterRel.getInput());
         ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, input.getRecordType());
         Expression expression = expressionConverter.from(filterRel.getCondition());
-        return Filter.builder().input(input).condition(expression).build();
+        var builder = Filter.builder();
+        if (filterRel.hasCommon() && filterRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(filterRel.getCommon().getEmit().getOutputMappingList()));
+        }
+        return builder.input(input).condition(expression).build();
     }
 
     private NamedStruct newNamedStruct(ReadRel readRel) {
@@ -116,6 +118,9 @@ public class ProtoRelConverter {
             Expression filter = expressionConverter.from(readRel.getFilter());
             builder.filter(filter);
         }
+        if (readRel.hasCommon() && readRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(readRel.getCommon().getEmit().getOutputMappingList()));
+        }
         return builder.build();
     }
 
@@ -123,13 +128,18 @@ public class ProtoRelConverter {
         NamedStruct namedStruct = newNamedStruct(readRel);
         ProtoExpressionConverter expressionConverter = new ProtoExpressionConverter(lookup, extensions, rootType);
         ImmutableNamedScan.Builder builder = NamedScan.builder()
-                .initialSchema(namedStruct)
-                // FIXME: Necessary since names are already in NamedStruct?
-                .names(readRel.getBaseSchema().getNamesList());
+                .initialSchema(namedStruct);
+        if (readRel.hasNamedTable()) {
+            builder.names(readRel.getNamedTable().getNamesList());
+        }
         if (readRel.hasFilter()) {
             Expression filter = expressionConverter.from(readRel.getFilter());
             builder.filter(filter);
         }
+        if (readRel.hasCommon() && readRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(readRel.getCommon().getEmit().getOutputMappingList()));
+        }
+
         return builder.build();
     }
 
@@ -148,12 +158,20 @@ public class ProtoRelConverter {
             ImmutableExpression.StructLiteral structLiteral = ImmutableExpression.StructLiteral.builder().fields(literals).build();
             structLiterals.add(structLiteral);
         }
-        return VirtualTableScan.builder().filter(filter).rows(structLiterals).build();
+        var builder = VirtualTableScan.builder();
+        if (readRel.hasCommon() && readRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(readRel.getCommon().getEmit().getOutputMappingList()));
+        }
+        return builder.filter(filter).rows(structLiterals).build();
     }
 
     private Fetch newFetch(FetchRel fetchRel) {
         Rel input = from(fetchRel.getInput());
-        return Fetch.builder()
+        var builder = Fetch.builder();
+        if (fetchRel.hasCommon() && fetchRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(fetchRel.getCommon().getEmit().getOutputMappingList()));
+        }
+        return builder
                 .input(input)
                 .count(fetchRel.getCount())
                 .offset(fetchRel.getOffset())
@@ -169,6 +187,9 @@ public class ProtoRelConverter {
             expressions.add(expression);
         }
         ImmutableProject.Builder builder = Project.builder();
+        if (projectRel.hasCommon() && projectRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(projectRel.getCommon().getEmit().getOutputMappingList()));
+        }
         return builder.input(input).expressions(expressions).build();
     }
 
@@ -212,7 +233,11 @@ public class ProtoRelConverter {
             Aggregate.Measure measure = builder.build();
             measures.add(measure);
         }
-        return Aggregate.builder().input(input).groupings(groupings).measures(measures).build();
+        var builder = Aggregate.builder();
+        if (aggregateRel.hasCommon() && aggregateRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(aggregateRel.getCommon().getEmit().getOutputMappingList()));
+        }
+        return builder.input(input).groupings(groupings).measures(measures).build();
     }
 
     private Sort newSort(SortRel sortRel) {
@@ -227,7 +252,11 @@ public class ProtoRelConverter {
                     .build();
             sortFields.add(sortField);
         }
-        return Sort.builder().input(input).sortFields(sortFields).build();
+        var builder = Sort.builder();
+        if (sortRel.hasCommon() && sortRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(sortRel.getCommon().getEmit().getOutputMappingList()));
+        }
+        return builder.input(input).sortFields(sortFields).build();
     }
 
     private Join newJoin(JoinRel joinRel) {
@@ -242,6 +271,9 @@ public class ProtoRelConverter {
                 .joinType(joinType)
                 .left(left)
                 .right(right);
+        if (joinRel.hasCommon() && joinRel.getCommon().hasEmit()) {
+            builder.remap(Rel.Remap.of(joinRel.getCommon().getEmit().getOutputMappingList()));
+        }
         if (joinRel.hasPostJoinFilter()) {
             Expression postFilter = expressionConverter.from(joinRel.getPostJoinFilter());
             builder.postJoinFilter(postFilter);

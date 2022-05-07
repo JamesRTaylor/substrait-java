@@ -1,30 +1,41 @@
 package io.substrait.isthmus;
 
 import io.substrait.expression.FunctionLookup;
+import io.substrait.expression.proto.FunctionCollector;
 import io.substrait.expression.proto.ImmutableFunctionLookup;
 import io.substrait.function.SimpleExtension;
 import io.substrait.proto.Plan;
 import io.substrait.proto.PlanRel;
 import io.substrait.relation.ProtoRelConverter;
+import io.substrait.relation.Rel;
+import io.substrait.relation.RelConverter;
 import org.apache.calcite.sql.parser.SqlParseException;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Arrays;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 public class ProtoRelConverterTest extends PlanTestBase {
+    private void assertProtoRelRoundrip(Plan p) throws IOException {
+        SimpleExtension.ExtensionCollection extensionCollection = SimpleExtension.loadDefaults();
+        FunctionLookup functionLookup = ImmutableFunctionLookup.builder().from(p).build();
+        ProtoRelConverter relConverter = new ProtoRelConverter(functionLookup, extensionCollection, null);
+        for (PlanRel planRel : p.getRelationsList()) {
+            io.substrait.proto.Rel protoRel1 = planRel.getRoot().getInput();
+            Rel rel = relConverter.from(protoRel1);
+            io.substrait.proto.Rel protoRel2 = new RelConverter(new FunctionCollector()).toProto(rel);
+            assertEquals(protoRel1,protoRel2);
+        }
+    }
     @Test
     public void aggregate() throws IOException, SqlParseException {
         SqlToSubstrait s = new SqlToSubstrait();
         String[] values = asString("tpch/schema.sql").split(";");
         var creates = Arrays.stream(values).filter(t -> !t.trim().isBlank()).toList();
         Plan p = s.execute("select count(L_ORDERKEY),sum(L_ORDERKEY) from lineitem ", creates);
-        SimpleExtension.ExtensionCollection extensionCollection = SimpleExtension.loadDefaults();
-        FunctionLookup functionLookup = ImmutableFunctionLookup.builder().from(p).build();
-        ProtoRelConverter relConverter = new ProtoRelConverter(functionLookup, extensionCollection, null);
-        for (PlanRel planRel : p.getRelationsList()) {
-            relConverter.from(planRel.getRoot().getInput());
-        }
+        assertProtoRelRoundrip(p);
     }
 
     @Test
@@ -33,12 +44,7 @@ public class ProtoRelConverterTest extends PlanTestBase {
         String[] values = asString("tpch/schema.sql").split(";");
         var creates = Arrays.stream(values).filter(t -> !t.trim().isBlank()).toList();
         Plan p = s.execute("select L_ORDERKEY from lineitem WHERE L_ORDERKEY + 1 > 10", creates);
-        SimpleExtension.ExtensionCollection extensionCollection = SimpleExtension.loadDefaults();
-        FunctionLookup functionLookup = ImmutableFunctionLookup.builder().from(p).build();
-        ProtoRelConverter relConverter = new ProtoRelConverter(functionLookup, extensionCollection, null);
-        for (PlanRel planRel : p.getRelationsList()) {
-            relConverter.from(planRel.getRoot().getInput());
-        }
+        assertProtoRelRoundrip(p);
     }
 
     @Test
@@ -72,11 +78,6 @@ public class ProtoRelConverterTest extends PlanTestBase {
                 "  revenue desc,\n" +
                 "  o.o_orderdate\n" +
                 "limit 10", creates);
-        SimpleExtension.ExtensionCollection extensionCollection = SimpleExtension.loadDefaults();
-        FunctionLookup functionLookup = ImmutableFunctionLookup.builder().from(p).build();
-        ProtoRelConverter relConverter = new ProtoRelConverter(functionLookup, extensionCollection, null);
-        for (PlanRel planRel : p.getRelationsList()) {
-            relConverter.from(planRel.getRoot().getInput());
-        }
+        assertProtoRelRoundrip(p);
     }
 }

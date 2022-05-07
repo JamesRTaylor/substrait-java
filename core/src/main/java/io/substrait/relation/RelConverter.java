@@ -29,7 +29,7 @@ public class RelConverter implements RelVisitor<Rel, RuntimeException> {
     return expression.accept(protoConverter);
   }
 
-  private io.substrait.proto.Rel toProto(io.substrait.relation.Rel rel) {
+  public io.substrait.proto.Rel toProto(io.substrait.relation.Rel rel) {
     return rel.accept(this);
   }
 
