@@ -2,9 +2,7 @@ package io.substrait.relation;
 
 import io.substrait.expression.Expression;
 import io.substrait.expression.proto.ExpressionProtoConverter;
-import io.substrait.expression.FunctionLookup;
 import io.substrait.expression.proto.FunctionCollector;
-import io.substrait.proto.Rel;
 import io.substrait.proto.*;
 import io.substrait.proto.Rel;
 import io.substrait.type.proto.TypeProtoConverter;
@@ -68,7 +66,8 @@ public class RelConverter implements RelVisitor<Rel, RuntimeException> {
             .setOutputType(toProto(measure.getFunction().getType()))
             .addAllArgs(toProto(measure.getFunction().arguments()))
             .addAllSorts(toProtoS(measure.getFunction().sort()))
-            .setFunctionReference(functionCollector.getFunctionReference(measure.getFunction().declaration()));
+            .setFunctionReference(
+                functionCollector.getFunctionReference(measure.getFunction().declaration()));
 
     var builder = AggregateRel.Measure.newBuilder().setMeasure(func);
 

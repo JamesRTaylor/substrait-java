@@ -244,7 +244,7 @@ public class ExpressionProtoConverter implements ExpressionVisitor<Expression, R
         .setScalarFunction(
             Expression.ScalarFunction.newBuilder()
                 .setOutputType(expr.getType().accept(TypeProtoConverter.INSTANCE))
-                .setFunctionReference(lookup.getFunctionReference(expr.declaration()))
+                .setFunctionReference(functionCollector.getFunctionReference(expr.declaration()))
                 .addAllArgs(expr.arguments().stream().map(a -> a.accept(this)).toList()))
         .build();
   }

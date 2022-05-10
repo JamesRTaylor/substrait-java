@@ -1,6 +1,5 @@
 package io.substrait.isthmus;
 
-import io.substrait.expression.FunctionLookup;
 import io.substrait.expression.proto.FunctionCollector;
 import io.substrait.function.ImmutableSimpleExtension;
 import io.substrait.function.SimpleExtension;

@@ -1,9 +1,9 @@
 package io.substrait.expression.proto;
 
-import io.substrait.expression.FunctionLookup;
 import io.substrait.expression.Expression;
 import io.substrait.expression.ExpressionCreator;
 import io.substrait.expression.FieldReference;
+import io.substrait.expression.FunctionLookup;
 import io.substrait.expression.ImmutableExpression;
 import io.substrait.function.SimpleExtension;
 import io.substrait.type.Type;
@@ -144,7 +144,7 @@ public class ProtoExpressionConverter {
   }
 
   public static Expression.Literal from(io.substrait.proto.Expression.Literal literal) {
-    return switch(literal.getLiteralTypeCase()) {
+    return switch (literal.getLiteralTypeCase()) {
       case BOOLEAN -> ExpressionCreator.bool(literal.getNullable(), literal.getBoolean());
       case I8 -> ExpressionCreator.i8(literal.getNullable(), literal.getI8());
       case I16 -> ExpressionCreator.i16(literal.getNullable(), literal.getI16());
