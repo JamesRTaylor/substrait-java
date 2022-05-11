@@ -1,3 +1,4 @@
 [submodule "spec"]
 	path = substrait
-	url = https://github.com/substrait-io/substrait.git
+	url = https://github.com/JamesRTaylor/substrait.git
+        branch = aggregate_func_invocation
