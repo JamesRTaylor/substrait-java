@@ -35,7 +35,7 @@ public class ProtoRelConverterTest extends PlanTestBase {
     SqlToSubstrait s = new SqlToSubstrait();
     String[] values = asString("tpch/schema.sql").split(";");
     var creates = Arrays.stream(values).filter(t -> !t.trim().isBlank()).toList();
-    Plan p = s.execute("select count(L_ORDERKEY),sum(L_ORDERKEY) from lineitem ", creates);
+    Plan p = s.execute("select count(DISTINCT L_ORDERKEY),sum(L_ORDERKEY) from lineitem ", creates);
     assertProtoRelRoundrip(p);
   }
 

@@ -227,6 +227,7 @@ public class ProtoRelConverter {
               .declaration(declaration)
               .outputType(outputType)
               .aggregationPhase(Expression.AggregationPhase.fromProto(protoAggFunction.getPhase()))
+              .invocation(protoAggFunction.getInvocation())
               .build();
       ImmutableMeasure.Builder builder = Aggregate.Measure.builder();
       builder.function(function);
